@@ -1,0 +1,139 @@
+#03/09/2015
+
+#Author
+#Sebastian ECHEVERRI RESTREPO
+#sebastianecheverrir@gmail.com
+
+#this file runs a relaxation simulation of a system containing
+#	a homopolymer, crosslinks  and fillers
+#the file sysCL.data containing the initial coordinates and 
+#	bonds needs to be in the same folder
+#The homopolymer contains only one type of beads and two types of bonds
+#The Filler contains only one type of beads and one type of bonds
+#There are no bonds between the filler and the homopolymer
+
+##################################################
+
+#user defined variables:
+
+variable 	timeStep	equal		
+variable 	Temperature	equal		
+variable	cutoff		equal		
+variable	totalTimeSteps	equal		
+
+variable	gamma		equal		
+
+#Polymer-Polymer interaction
+variable	App		equal		
+variable	kpp		equal		  #Note that the usual 1/2 factor is included in kpp 
+variable	r0p		equal	 	#equilibrium bond lenght
+variable	CLkpp		equal		   	#kpp for crosslinks 
+variable	CLr0		equal		  	#r0 for crosslinks
+
+#filler-filler interaction
+variable	Aff		equal		
+variable	kff		equal	  	#Note that the usual 1/2 factor is included in kpp 
+variable	r0f		equal	 	#equilibrium bond lenght
+
+
+#Polymer-Filler interaction
+variable	Apf		equal		
+variable	CLkpf		equal		   	#kpp for crosslinks Polymer-Filler
+variable	CLr0pf		equal		  	#r0 for crosslinks Polymer-Filler
+
+
+##################################################
+
+#Normally, this file should not be modified from here on
+
+units          	lj
+atom_style     	angle
+boundary       	p p p
+dimension      	3   
+
+
+read_data 	"homopolymer+Filler_Types.data"
+
+pair_style     	hybrid/overlay dpd ${Temperature} ${cutoff} 12345 &
+		dpd/tstat ${Temperature}  ${Temperature}  ${cutoff} 12345
+pair_coeff     	1 1   dpd ${App}  0.000000
+pair_coeff     	1 1   dpd/tstat ${gamma}
+
+pair_coeff     	1 3   dpd ${App}  0.000000
+pair_coeff     	1 3   dpd/tstat ${gamma}
+
+pair_coeff     	3 3   dpd ${App}  0.000000
+pair_coeff     	3 3   dpd/tstat ${gamma}
+
+
+pair_coeff     	1 2   dpd ${Apf}  0.000000
+pair_coeff     	1 2   dpd/tstat ${gamma}	
+
+pair_coeff     	1 4   dpd ${Apf}  0.000000
+pair_coeff     	1 4   dpd/tstat ${gamma}	
+
+pair_coeff     	2 3   dpd ${Apf}  0.000000
+pair_coeff     	2 3   dpd/tstat ${gamma}	
+
+pair_coeff     	3 4   dpd ${Apf}  0.000000
+pair_coeff     	3 4   dpd/tstat ${gamma}	
+
+
+pair_coeff     	2 2   dpd ${Aff}  0.000000
+pair_coeff     	2 2   dpd/tstat ${gamma}	
+
+pair_coeff     	2 4   dpd ${Aff}  0.000000
+pair_coeff     	2 4   dpd/tstat ${gamma}	
+
+pair_coeff     	4 4   dpd ${Aff}  0.000000
+pair_coeff     	4 4   dpd/tstat ${gamma}	
+
+
+#1 p
+#2 f
+#3 p
+#4 f
+
+bond_style     	harmonic
+special_bonds  	lj 1.0 1.0 1.0 extra 10000
+bond_coeff     	1  ${kpp}  ${r0p}
+bond_coeff     	2   ${kff}  ${r0f}
+bond_coeff     	3  ${CLkpp}  ${CLr0}
+bond_coeff     	4  ${CLkpf}  ${CLr0pf}
+
+
+velocity       	all create ${Temperature} 12345 mom yes rot yes dist gaussian
+comm_modify    	mode single vel yes
+neighbor       	2.0 bin
+neigh_modify   	delay 2
+timestep       	${timeStep}
+
+
+fix 		1 all nve 
+#dump           	1 all atom ${totalTimeSteps} system.dump 
+#dump            3 all custom ${totalTimeSteps} vels.dump id type vx vy vz
+#dump_modify    1 scale no image yes
+thermo_style   	custom etotal ke pe ebond enthalpy temp press pxx pxy pxz pyy pyz pzz lx ly lz xy xz yz
+thermo_modify  	line multi
+thermo         	10
+thermo_modify  	flush yes
+
+
+run             ${totalTimeSteps}
+
+fix         CrosslinkPolymerFiller all bond/create 200 4 1 0.9 4  iparam 1 2 jparam 1 1
+#variable    NbondPF1 equal f_CrosslinkPolymerFiller[1]
+#variable    NbondPF2 equal f_CrosslinkPolymerFiller[2]
+#fix         extra all print 200 "${NbondPF1} ${NbondPF2}"
+
+
+fix         CrosslinkPolymerPolymer all bond/create 200 3 1 0.85 3  iparam 1 1 jparam 1 1 prob 0.5 12345
+#variable    NbondPP1 equal f_CrosslinkPolymerPolymer[1]
+#variable    NbondPP2 equal f_CrosslinkPolymerPolymer[2]
+#fix         extra all print 200 "${NbondPP1} ${NbondPP2}"
+
+
+
+run            	${totalTimeSteps}
+
+write_data	CLhomopolymer+CLFiller_Types.data
